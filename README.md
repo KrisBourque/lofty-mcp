@@ -73,17 +73,25 @@ node --version  # must be v18.0.0 or higher
 
 ### 2. Lofty API Key or OAuth Token
 
-Lofty supports two authentication methods — both go in the same `LOFTY_API_KEY` environment variable as a Bearer token:
+Lofty supports two authentication methods. Both go in the `LOFTY_API_KEY` environment variable, **but they use different `Authorization` schemes** (per the [Lofty auth docs](https://developer.lofty.com/authentication)):
+
+| Credential | `Authorization` header | Set `LOFTY_AUTH_SCHEME` to |
+|------------|------------------------|----------------------------|
+| OAuth2 access token | `Bearer <token>` | `Bearer` (default) |
+| API Key | `token <key>` | `token` |
+
+> ⚠️ **API Keys must use `LOFTY_AUTH_SCHEME=token`.** If you send an API Key with the default `Bearer` scheme, Lofty rejects it with `400 · code 200058 · "User in token does not exist."` even though the key is valid.
 
 **OAuth2 Access Token (recommended for production):**
 1. Register your application in the Lofty developer portal
 2. Complete the OAuth2 flow to obtain an access token
-3. Use the access token as your `LOFTY_API_KEY`
+3. Use the access token as your `LOFTY_API_KEY` (leave `LOFTY_AUTH_SCHEME` unset / `Bearer`)
 
-**API Key (for testing/scripts):**
+**API Key (for personal automation, scripts, CLI):**
 1. Log in to your Lofty account
-2. Go to **Settings → API Keys** (or contact Lofty support)
+2. Go to **Settings → Integrations → API Keys** (or contact Lofty support)
 3. Generate and copy your API key
+4. Set `LOFTY_API_KEY` to the key **and** `LOFTY_AUTH_SCHEME=token`
 
 > **Note:** The Lofty v1 legacy API is scheduled for sunset on **August 1, 2026**. The tools in this server target the current v2 API paths where available.
 
@@ -510,7 +518,8 @@ LOFTY_API_KEY=your_token node dist/index.js
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `LOFTY_API_KEY` | Yes | — | Your Lofty Bearer token (OAuth2 access token or API key) |
+| `LOFTY_API_KEY` | Yes | — | Your Lofty credential — an OAuth2 access token or an API key |
+| `LOFTY_AUTH_SCHEME` | No | `"Bearer"` | `Authorization` scheme. Use `Bearer` for OAuth2 tokens; **use `token` for API keys** (required — see Authentication above) |
 | `LOFTY_SAFE_MODE` | No | `"true"` | Set to `"false"` to enable delete/destructive tools |
 
 ---

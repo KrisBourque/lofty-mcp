@@ -32,8 +32,13 @@ export function getConfig(): LoftyConfig {
 }
 
 function buildHeaders(config: LoftyConfig): Record<string, string> {
+  // Lofty auth schemes differ by credential type (per https://developer.lofty.com/authentication):
+  //   API Key       -> "Authorization: token <api_key>"
+  //   OAuth token   -> "Authorization: Bearer <access_token>"
+  // Configurable via LOFTY_AUTH_SCHEME; defaults to Bearer for backward compatibility.
+  const scheme = process.env.LOFTY_AUTH_SCHEME || "Bearer";
   return {
-    Authorization: `Bearer ${config.apiKey}`,
+    Authorization: `${scheme} ${config.apiKey}`,
     "Content-Type": "application/json",
     Accept: "application/json",
   };
@@ -103,13 +108,24 @@ export async function loftyRequest<T = unknown>(
 
 export function formatError(error: unknown): string {
   if (error instanceof LoftyApiError) {
-    return JSON.stringify({
+    const out: Record<string, unknown> = {
       error: true,
       status: error.status,
       endpoint: error.endpoint,
       message: error.message,
       details: error.body,
-    }, null, 2);
+    };
+    // "User in token does not exist" (code 200058) almost always means an API Key
+    // is being sent with the wrong auth scheme. API keys require "Authorization: token <key>",
+    // not "Bearer". Surface an actionable hint instead of a cryptic error.
+    const code = (error.body as { code?: number })?.code;
+    if (code === 200058 && (process.env.LOFTY_AUTH_SCHEME || "Bearer") !== "token") {
+      out.hint =
+        "Authentication failed. If LOFTY_API_KEY is a Lofty API Key (from Settings -> API Keys), " +
+        "set LOFTY_AUTH_SCHEME=token -- API keys must be sent as 'Authorization: token <key>', not 'Bearer'. " +
+        "See https://developer.lofty.com/authentication";
+    }
+    return JSON.stringify(out, null, 2);
   }
   if (error instanceof Error) {
     return JSON.stringify({ error: true, message: error.message });
