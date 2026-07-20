@@ -101,18 +101,34 @@ describe('communication tools', () => {
 
   // ── searchCommunicationsByAgent ────────────────────────────────────────────
   describe('searchCommunicationsByAgent', () => {
-    it('POST /v1.0/agent/communication with body', async () => {
+    it('POST /v1.0/agent/communication, uppercasing type and converting times to epoch ms', async () => {
       const fetch = mockFetchSuccess({ items: [] });
       await getTool('searchCommunicationsByAgent').handler(
-        { agentId: 5, type: 'call', offset: 0, limit: 20 },
+        { type: 'call', startTime: '2026-07-20T00:00:00Z', endTime: '2026-07-20T23:59:59Z', offset: 0, limit: 20 },
         TEST_CONFIG,
       );
       const call = parseLastFetchCall(fetch);
       expect(call.method).toBe('POST');
       expect(call.pathname).toBe('/v1.0/agent/communication');
-      expect(call.body?.agentId).toBe(5);
-      expect(call.body?.type).toBe('call');
+      // API requires the uppercase enum, not the lowercase value
+      expect(call.body?.type).toBe('CALL');
+      // API requires epoch milliseconds, not ISO strings
+      expect(call.body?.startTime).toBe(Date.parse('2026-07-20T00:00:00Z'));
+      expect(call.body?.endTime).toBe(Date.parse('2026-07-20T23:59:59Z'));
       expect(call.body?.offset).toBe(0);
+      expect(call.body?.limit).toBe(20);
+    });
+
+    it('accepts epoch-millisecond timestamps as-is', async () => {
+      const fetch = mockFetchSuccess({ items: [] });
+      await getTool('searchCommunicationsByAgent').handler(
+        { type: 'TEXT', startTime: 1784505600000, endTime: 1784591999000 },
+        TEST_CONFIG,
+      );
+      const call = parseLastFetchCall(fetch);
+      expect(call.body?.type).toBe('TEXT');
+      expect(call.body?.startTime).toBe(1784505600000);
+      expect(call.body?.endTime).toBe(1784591999000);
     });
 
     it('works with no body fields', async () => {

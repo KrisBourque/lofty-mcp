@@ -100,7 +100,7 @@ describe('listing tools', () => {
       expect(JSON.parse(result)).toEqual(MOCK_DATA);
     });
 
-    it('sends full ListingQueryRequest as body', async () => {
+    it('maps flat filters into the ListingQueryRequest filterConditions structure', async () => {
       const fetchMock = mockFetchSuccess(MOCK_DATA);
       const tool = getTool('searchListingsV2');
       const body = {
@@ -109,25 +109,48 @@ describe('listing tools', () => {
         priceMax: 500000,
         bedroomsMin: 2,
         bathroomsMin: 1,
-        propertyType: 'single_family',
+        propertyType: 'Single Family Home',
+        purchaseType: 'For Sale',
         city: 'Austin',
         state: 'TX',
         zipCode: '78701',
-        offset: 0,
         limit: 20,
+        sort: 'PRICE_ASC',
       };
       await tool.handler(body, TEST_CONFIG);
       const call = parseLastFetchCall(fetchMock);
-      expect(call.body).toEqual(body);
+      expect(call.body).toEqual({
+        searchScope: 'all',
+        soldFlag: false,
+        filterConditions: {
+          // only `city` is sent — see handler note: multi-key location is ignored by the API
+          location: { city: ['Austin'] },
+          price: '200000,500000',
+          beds: '2,',
+          baths: '1,',
+          propertyType: ['Single Family Home'],
+          purchaseType: ['For Sale'],
+        },
+        pageNum: 1,
+        pageSize: 20,
+        keyword: 'downtown',
+        sortFields: ['PRICE_ASC'],
+      });
     });
 
-    it('works with empty body', async () => {
+    it('works with empty body (sends sane defaults)', async () => {
       const fetchMock = mockFetchSuccess(MOCK_DATA);
       const tool = getTool('searchListingsV2');
       await tool.handler({}, TEST_CONFIG);
       const call = parseLastFetchCall(fetchMock);
       expect(call.method).toBe('POST');
-      expect(call.body).toEqual({});
+      expect(call.body).toEqual({
+        searchScope: 'all',
+        soldFlag: false,
+        filterConditions: {},
+        pageNum: 1,
+        pageSize: 25,
+      });
     });
 
     it('returns formatted error on 500', async () => {

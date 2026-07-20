@@ -78,21 +78,41 @@ export const communicationTools: ToolDef[] = [
   // ── search by agent ──────────────────────────────────────────────────────────
   {
     name: 'searchCommunicationsByAgent',
-    description: 'Search communications by agent with optional filters.',
+    description:
+      'Search the agent\'s communications (calls, texts, emails) in a time window — includes INBOUND messages, so this is how you detect lead replies. NOTE: the API caps a single query at a 24-hour window.',
     inputSchema: {
       type: 'object',
       properties: {
-        agentId: { type: 'integer', description: 'Agent ID to filter by' },
-        startTime: { type: 'string', description: 'Start time filter (ISO 8601)' },
-        endTime: { type: 'string', description: 'End time filter (ISO 8601)' },
-        type: { type: 'string', enum: ['call', 'email', 'text'], description: 'Communication type' },
-        offset: { type: 'integer', description: 'Pagination offset' },
-        limit: { type: 'integer', description: 'Max number of results to return' },
+        startTime: { type: 'string', description: 'Start of window — ISO 8601 string or epoch milliseconds (required)' },
+        endTime: { type: 'string', description: 'End of window — ISO 8601 string or epoch ms. Max 24h after startTime (required)' },
+        type: { type: 'string', enum: ['CALL', 'TEXT', 'EMAIL'], description: 'Communication type (required)' },
+        teamView: { type: 'boolean', description: "Include team leads' communications. Default false." },
+        offset: { type: 'integer', description: 'Pagination offset (default 0)' },
+        limit: { type: 'integer', description: 'Max results (default 10, max 1000)' },
       },
+      required: ['startTime', 'endTime', 'type'],
     },
     handler: async (args: Record<string, unknown>, config: LoftyConfig): Promise<string> => {
       try {
-        const body = stripMeta(args);
+        const a = stripMeta(args);
+        // The API requires: UPPERCASE type enum, and epoch-millisecond timestamps
+        // (not ISO strings). Accept either form from the caller and normalize.
+        const toEpochMs = (v: unknown): number | undefined => {
+          if (v == null) return undefined;
+          if (typeof v === 'number') return v;
+          const s = String(v);
+          if (/^\d+$/.test(s)) return Number(s);
+          const t = Date.parse(s);
+          return Number.isNaN(t) ? undefined : t;
+        };
+        const body: Record<string, unknown> = {
+          type: a.type ? String(a.type).toUpperCase() : undefined,
+          startTime: toEpochMs(a.startTime),
+          endTime: toEpochMs(a.endTime),
+          offset: a.offset ?? 0,
+          limit: a.limit ?? 50,
+        };
+        if (a.teamView !== undefined) body.teamView = a.teamView === true;
         const data = await loftyRequest('POST', '/v1.0/agent/communication', { config, body });
         return JSON.stringify(data, null, 2);
       } catch (e) {
