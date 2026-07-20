@@ -6,6 +6,7 @@ import {
   LoftyApiError,
   LOFTY_BASE_URL,
   stripMeta,
+  parseJsonPreservingBigIds,
 } from '../src/client.js';
 import { mockFetchSuccess, mockFetchError, TEST_CONFIG } from './helpers.js';
 
@@ -231,5 +232,41 @@ describe('stripMeta', () => {
   it('preserves all non-meta keys', () => {
     const input = { leadId: 42, firstName: 'Jane', stage: 'Active' };
     expect(stripMeta(input)).toEqual(input);
+  });
+});
+
+// ── parseJsonPreservingBigIds ────────────────────────────────────────────────
+
+describe('parseJsonPreservingBigIds', () => {
+  it('preserves int64 IDs that exceed Number.MAX_SAFE_INTEGER as exact strings', () => {
+    // JSON.parse rounds this to ...573000, corrupting the ID. Compare string
+    // forms — a numeric literal in this file would be rounded identically.
+    const raw = '{"id": 1239258866013572993}';
+    expect(String((JSON.parse(raw) as { id: number }).id)).not.toBe('1239258866013572993');
+    const out = parseJsonPreservingBigIds(raw) as { id: string };
+    expect(out.id).toBe('1239258866013572993');
+  });
+
+  it('leaves safe integers as numbers', () => {
+    const out = parseJsonPreservingBigIds('{"leadId": 1139922729331754}') as { leadId: number };
+    expect(typeof out.leadId).toBe('number');
+    expect(out.leadId).toBe(1139922729331754);
+  });
+
+  it('handles oversized integers inside arrays', () => {
+    const out = parseJsonPreservingBigIds('{"ids": [1239258866013572994, 5]}') as { ids: unknown[] };
+    expect(out.ids[0]).toBe('1239258866013572994');
+    expect(out.ids[1]).toBe(5);
+  });
+
+  it('does not alter digit sequences inside string values', () => {
+    const out = parseJsonPreservingBigIds('{"note": "1239258866013572993"}') as { note: string };
+    expect(out.note).toBe('1239258866013572993');
+  });
+
+  it('leaves negative and floating point values intact', () => {
+    const out = parseJsonPreservingBigIds('{"a": -1, "b": 1.5}') as { a: number; b: number };
+    expect(out.a).toBe(-1);
+    expect(out.b).toBe(1.5);
   });
 });

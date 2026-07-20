@@ -3,18 +3,25 @@ import { type ToolDef, loftyRequest, formatError, stripMeta } from '../client.js
 export const notes: ToolDef[] = [
   {
     name: 'listNotes',
-    description: 'List notes for a lead.',
+    description:
+      'List notes for a lead, including system-generated notes by default (pass includeSystemNote:false to omit them). System notes carry real context — e.g. "The lead is interested in a showing" — and are easy to miss.',
     inputSchema: {
       type: 'object',
       required: ['leadId'],
       properties: {
         leadId: { type: 'integer', description: 'Lead ID (required)' },
-        includeSystemNote: { type: 'boolean', description: 'Include system-generated notes' },
+        includeSystemNote: {
+          type: 'boolean',
+          description: 'Include system-generated notes. Defaults to true so no context is silently dropped.',
+        },
       },
     },
     handler: async (args, config) => {
       try {
         const params = stripMeta(args);
+        // The API omits system notes unless asked, which silently hides real
+        // context from anything researching a lead. Default to including them.
+        if (params.includeSystemNote === undefined) params.includeSystemNote = true;
         const data = await loftyRequest('GET', '/v1.0/notes', { config, params });
         return JSON.stringify(data, null, 2);
       } catch (e) {

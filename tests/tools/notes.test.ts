@@ -40,6 +40,23 @@ describe('notes tools', () => {
       expect(call.params.includeSystemNote).toBe('true');
     });
 
+    it('defaults includeSystemNote to true so system notes are not silently dropped', async () => {
+      const mock = mockFetchSuccess({ items: [] });
+      await tool('listNotes').handler({ leadId: 42 }, TEST_CONFIG);
+      const call = parseLastFetchCall(mock);
+      expect(call.params.includeSystemNote).toBe('true');
+    });
+
+    it('still honors an explicit includeSystemNote:false', async () => {
+      const mock = mockFetchSuccess({ items: [] });
+      await tool('listNotes').handler(
+        { leadId: 42, includeSystemNote: false },
+        TEST_CONFIG,
+      );
+      const call = parseLastFetchCall(mock);
+      expect(call.params.includeSystemNote).toBe('false');
+    });
+
     it('returns error on 401', async () => {
       mockFetchError(401);
       const result = await tool('listNotes').handler({ leadId: 1 }, TEST_CONFIG);

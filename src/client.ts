@@ -44,6 +44,23 @@ function buildHeaders(config: LoftyConfig): Record<string, string> {
   };
 }
 
+// Lofty returns int64 identifiers (communication IDs, activity IDs) that exceed
+// JavaScript's safe integer range (2^53-1). JSON.parse silently rounds them —
+// e.g. 1239258866013572993 becomes 1239258866013573000 — which corrupts any ID
+// later used to fetch a single record, producing bogus "Permission denied"
+// errors. Quote oversized integer values so they survive as exact strings.
+// Matches integers appearing as JSON values (after ':', '[' or ','), never
+// inside quoted strings or object keys.
+const UNSAFE_INT_RE = /([:[,]\s*)(-?\d{16,})(?=\s*[,}\]])/g;
+
+export function parseJsonPreservingBigIds(text: string): unknown {
+  return JSON.parse(
+    text.replace(UNSAFE_INT_RE, (match, prefix: string, digits: string) =>
+      Number.isSafeInteger(Number(digits)) ? match : `${prefix}"${digits}"`
+    )
+  );
+}
+
 export class LoftyApiError extends Error {
   constructor(
     public status: number,
@@ -95,12 +112,13 @@ export async function loftyRequest<T = unknown>(
     if (!response.ok) {
       const text = await response.text();
       let errorBody: unknown;
-      try { errorBody = JSON.parse(text); } catch { errorBody = text; }
+      try { errorBody = parseJsonPreservingBigIds(text); } catch { errorBody = text; }
       throw new LoftyApiError(response.status, response.statusText, errorBody, path);
     }
 
     if (response.status === 204) return {} as T;
-    return response.json() as Promise<T>;
+    const text = await response.text();
+    return parseJsonPreservingBigIds(text) as T;
   }
 
   throw new Error("Max retries exceeded");
