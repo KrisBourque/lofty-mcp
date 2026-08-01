@@ -6,6 +6,7 @@
 [![Node.js: >=18](https://img.shields.io/badge/Node.js-%3E%3D18-green)](https://nodejs.org)
 [![MCP Protocol](https://img.shields.io/badge/MCP-1.0-blue)](https://modelcontextprotocol.io)
 [![Lofty API](https://img.shields.io/badge/Lofty-API-6B21A8)](https://api.lofty.com)
+[![MCP Badge](https://lobehub.com/badge/mcp/nerdsnipe-inc-lofty-mcp)](https://lobehub.com/mcp/nerdsnipe-inc-lofty-mcp)
 
 **Give any AI agent full access to your Lofty (formerly Chime) CRM via natural language.**
 
